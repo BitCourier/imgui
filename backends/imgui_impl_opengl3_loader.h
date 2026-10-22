@@ -114,7 +114,7 @@ extern "C" {
 #define GLAPI extern
 #endif
 /* glcorearb.h is for use with OpenGL core profile implementations.
-** It should should be placed in the same directory as gl.h and
+** It should be placed in the same directory as gl.h and
 ** included as <GL/glcorearb.h>.
 **
 ** glcorearb.h includes only APIs in the latest OpenGL core profile
@@ -180,6 +180,7 @@ typedef khronos_uint8_t GLubyte;
 #define GL_RENDERER                       0x1F01
 #define GL_VERSION                        0x1F02
 #define GL_EXTENSIONS                     0x1F03
+#define GL_NEAREST                        0x2600
 #define GL_LINEAR                         0x2601
 #define GL_TEXTURE_MAG_FILTER             0x2800
 #define GL_TEXTURE_MIN_FILTER             0x2801
@@ -302,6 +303,7 @@ typedef khronos_uint16_t GLushort;
 #define GL_LINK_STATUS                    0x8B82
 #define GL_INFO_LOG_LENGTH                0x8B84
 #define GL_CURRENT_PROGRAM                0x8B8D
+#define GL_LOWER_LEFT                     0x8CA1
 #define GL_UPPER_LEFT                     0x8CA2
 typedef void (APIENTRYP PFNGLBLENDEQUATIONSEPARATEPROC) (GLenum modeRGB, GLenum modeAlpha);
 typedef void (APIENTRYP PFNGLATTACHSHADERPROC) (GLuint program, GLuint shader);
@@ -400,9 +402,15 @@ GLAPI void APIENTRY glDrawElementsBaseVertex (GLenum mode, GLsizei count, GLenum
 #ifndef GL_VERSION_3_3
 #define GL_VERSION_3_3 1
 #define GL_SAMPLER_BINDING                0x8919
+typedef void (APIENTRYP PFNGLGENSAMPLERSPROC) (GLsizei count, GLuint *samplers);
+typedef void (APIENTRYP PFNGLDELETESAMPLERSPROC) (GLsizei count, const GLuint *samplers);
 typedef void (APIENTRYP PFNGLBINDSAMPLERPROC) (GLuint unit, GLuint sampler);
+typedef void (APIENTRYP PFNGLSAMPLERPARAMETERIPROC) (GLuint sampler, GLenum pname, GLint param);
 #ifdef GL_GLEXT_PROTOTYPES
+GLAPI void APIENTRY glGenSamplers (GLsizei count, GLuint *samplers);
+GLAPI void APIENTRY glDeleteSamplers (GLsizei count, const GLuint *samplers);
 GLAPI void APIENTRY glBindSampler (GLuint unit, GLuint sampler);
+GLAPI void APIENTRY glSamplerParameteri (GLuint sampler, GLenum pname, GLint param);
 #endif
 #endif /* GL_VERSION_3_3 */
 #ifndef GL_VERSION_4_1
@@ -483,7 +491,7 @@ GL3W_API GL3WglProc imgl3wGetProcAddress(const char *proc);
 
 /* gl3w internal state */
 union ImGL3WProcs {
-    GL3WglProc ptr[60];
+    GL3WglProc ptr[63];
     struct {
         PFNGLACTIVETEXTUREPROC            ActiveTexture;
         PFNGLATTACHSHADERPROC             AttachShader;
@@ -503,6 +511,7 @@ union ImGL3WProcs {
         PFNGLCREATESHADERPROC             CreateShader;
         PFNGLDELETEBUFFERSPROC            DeleteBuffers;
         PFNGLDELETEPROGRAMPROC            DeleteProgram;
+        PFNGLDELETESAMPLERSPROC           DeleteSamplers;
         PFNGLDELETESHADERPROC             DeleteShader;
         PFNGLDELETETEXTURESPROC           DeleteTextures;
         PFNGLDELETEVERTEXARRAYSPROC       DeleteVertexArrays;
@@ -515,6 +524,7 @@ union ImGL3WProcs {
         PFNGLENABLEVERTEXATTRIBARRAYPROC  EnableVertexAttribArray;
         PFNGLFLUSHPROC                    Flush;
         PFNGLGENBUFFERSPROC               GenBuffers;
+        PFNGLGENSAMPLERSPROC              GenSamplers;
         PFNGLGENTEXTURESPROC              GenTextures;
         PFNGLGENVERTEXARRAYSPROC          GenVertexArrays;
         PFNGLGETATTRIBLOCATIONPROC        GetAttribLocation;
@@ -535,6 +545,7 @@ union ImGL3WProcs {
         PFNGLPIXELSTOREIPROC              PixelStorei;
         PFNGLPOLYGONMODEPROC              PolygonMode;
         PFNGLREADPIXELSPROC               ReadPixels;
+        PFNGLSAMPLERPARAMETERIPROC        SamplerParameteri;
         PFNGLSCISSORPROC                  Scissor;
         PFNGLSHADERSOURCEPROC             ShaderSource;
         PFNGLTEXIMAGE2DPROC               TexImage2D;
@@ -569,6 +580,7 @@ GL3W_API extern union ImGL3WProcs imgl3wProcs;
 #define glCreateShader                    imgl3wProcs.gl.CreateShader
 #define glDeleteBuffers                   imgl3wProcs.gl.DeleteBuffers
 #define glDeleteProgram                   imgl3wProcs.gl.DeleteProgram
+#define glDeleteSamplers                  imgl3wProcs.gl.DeleteSamplers
 #define glDeleteShader                    imgl3wProcs.gl.DeleteShader
 #define glDeleteTextures                  imgl3wProcs.gl.DeleteTextures
 #define glDeleteVertexArrays              imgl3wProcs.gl.DeleteVertexArrays
@@ -581,6 +593,7 @@ GL3W_API extern union ImGL3WProcs imgl3wProcs;
 #define glEnableVertexAttribArray         imgl3wProcs.gl.EnableVertexAttribArray
 #define glFlush                           imgl3wProcs.gl.Flush
 #define glGenBuffers                      imgl3wProcs.gl.GenBuffers
+#define glGenSamplers                     imgl3wProcs.gl.GenSamplers
 #define glGenTextures                     imgl3wProcs.gl.GenTextures
 #define glGenVertexArrays                 imgl3wProcs.gl.GenVertexArrays
 #define glGetAttribLocation               imgl3wProcs.gl.GetAttribLocation
@@ -601,6 +614,7 @@ GL3W_API extern union ImGL3WProcs imgl3wProcs;
 #define glPixelStorei                     imgl3wProcs.gl.PixelStorei
 #define glPolygonMode                     imgl3wProcs.gl.PolygonMode
 #define glReadPixels                      imgl3wProcs.gl.ReadPixels
+#define glSamplerParameteri               imgl3wProcs.gl.SamplerParameteri
 #define glScissor                         imgl3wProcs.gl.Scissor
 #define glShaderSource                    imgl3wProcs.gl.ShaderSource
 #define glTexImage2D                      imgl3wProcs.gl.TexImage2D
@@ -701,7 +715,11 @@ static void close_libgl(void)
 
 static int is_library_loaded(const char* name, void** lib)
 {
+#if defined(__HAIKU__)
+    *lib = NULL; // no support for RTLD_NOLOAD on Haiku.
+#else
     *lib = dlopen(name, RTLD_LAZY | RTLD_LOCAL | RTLD_NOLOAD);
+#endif
     return *lib != NULL;
 }
 
@@ -819,6 +837,7 @@ static int parse_version(void)
 }
 
 static void load_procs(GL3WGetProcAddressProc proc);
+static void clear_procs();
 
 int imgl3wInit(void)
 {
@@ -838,6 +857,7 @@ int imgl3wInit2(GL3WGetProcAddressProc proc)
 void imgl3wShutdown(void)
 {
     close_libgl();
+    clear_procs();
 }
 
 int imgl3wIsSupported(int major, int minor)
@@ -870,6 +890,7 @@ static const char *proc_names[] = {
     "glCreateShader",
     "glDeleteBuffers",
     "glDeleteProgram",
+    "glDeleteSamplers",
     "glDeleteShader",
     "glDeleteTextures",
     "glDeleteVertexArrays",
@@ -882,6 +903,7 @@ static const char *proc_names[] = {
     "glEnableVertexAttribArray",
     "glFlush",
     "glGenBuffers",
+    "glGenSamplers",
     "glGenTextures",
     "glGenVertexArrays",
     "glGetAttribLocation",
@@ -902,6 +924,7 @@ static const char *proc_names[] = {
     "glPixelStorei",
     "glPolygonMode",
     "glReadPixels",
+    "glSamplerParameteri",
     "glScissor",
     "glShaderSource",
     "glTexImage2D",
@@ -921,6 +944,13 @@ static void load_procs(GL3WGetProcAddressProc proc)
     size_t i;
     for (i = 0; i < GL3W_ARRAY_SIZE(proc_names); i++)
         imgl3wProcs.ptr[i] = proc(proc_names[i]);
+}
+
+static void clear_procs()
+{
+    size_t i;
+    for (i = 0; i < GL3W_ARRAY_SIZE(proc_names); i++)
+        imgl3wProcs.ptr[i] = nullptr;
 }
 
 #ifdef __cplusplus
